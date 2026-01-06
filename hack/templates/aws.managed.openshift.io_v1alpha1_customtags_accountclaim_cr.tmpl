@@ -1,0 +1,31 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- name: NAME
+- name: NAMESPACE
+metadata:
+  name: test-aws-customtags-accountclaim-template
+objects:
+- apiVersion: aws.managed.openshift.io/v1alpha1
+  kind: AccountClaim
+  metadata:
+    name: ${NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    accountLink: ""
+    aws:
+      regions:
+      - name: us-east-1
+    awsCredentialSecret:
+      name: aws
+      namespace: ${NAMESPACE}
+    legalEntity:
+      id: "111111"
+      name: ${NAME}
+    customTags:
+    - key: "test-team"
+      value: "platform-engineering"
+    - key: "test-environment"
+      value: "integration-test"
+    - key: "test-cost-center"
+      value: "12345"

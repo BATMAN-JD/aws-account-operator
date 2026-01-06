@@ -2,18 +2,25 @@
 
 # Test Description:
 #  When an Account CR is created, AAO has to do some AWS side setup before the account can
-#  be added to the account pool (region initialization is the big one). 
+#  be added to the account pool (region initialization is the big one).
 #
-#  This test creates an Account CR then verifies the account becomes ready and generates 
+#  This test creates an Account CR then verifies the account becomes ready and generates
 #  valid AWS credentials to access the "new" account.
 #
-#  normally this Account CR creation process is handled automatically by the AccountPool 
-#  controller which actually creates a new AWS account as well, but for testing purposes 
-#  we create an Account CR manually for the AWS account we have already created to be 
+#  normally this Account CR creation process is handled automatically by the AccountPool
+#  controller which actually creates a new AWS account as well, but for testing purposes
+#  we create an Account CR manually for the AWS account we have already created to be
 #  reused for all the tests
 
-# Load Environment vars
 source test/integration/integration-test-lib.sh
+
+# Run pre-flight checks on first run
+if [ "${SKIP_PREFLIGHT_CHECKS:-false}" != "true" ]; then
+    if ! preflightChecks; then
+        echo "Pre-flight checks failed. Set SKIP_PREFLIGHT_CHECKS=true to bypass."
+        exit $EXIT_FAIL_UNEXPECTED_ERROR
+    fi
+fi
 
 EXIT_TEST_FAIL_NO_ACCOUNT_SECRET=1
 EXIT_TEST_FAIL_SECRET_INVALID_KEYS=2
@@ -108,13 +115,13 @@ function verifyAccountSecrets {
       return $EXIT_TEST_FAIL_SECRET_INVALID_KEYS
     fi
 
-    # if the aws access key id is set, we should check the credential too.
-    echo "Verifying AWS credentials work."
+    echo "Verifying AWS credentials work (with retry for transient errors)."
     if [ -n "$AWS_ACCESS_KEY_ID" ]; then
-        if ! aws sts get-caller-identity > /dev/null 2>&1; then
-            echo "Credentials for $accountCrName are invalid."
+        if ! retryWithBackoff "$MAX_RETRIES" aws sts get-caller-identity > /dev/null 2>&1; then
+            echo "Credentials for $accountCrName are invalid after $MAX_RETRIES attempts."
             return $EXIT_TEST_FAIL_SECRET_INVALID_CREDS
         fi
+        echo "AWS credentials validated successfully."
     fi
 
     return "$EXIT_PASS"
