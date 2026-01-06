@@ -86,7 +86,45 @@ test-fake-accountclaim: create-fake-accountclaim ## Runs a full integration test
 .PHONY: test-kms
 test-kms: create-kms-ccs-secret create-kms-accountclaim validate-kms delete-kms-accountclaim delete-kms-ccs-secret delete-kms-accountclaim-namespace
 	test/integration/tests/validate_kms_key.sh
-	
+
 	@oc process --local -p NAME=${KMS_CLAIM_NAME} -p NAMESPACE=${KMS_NAMESPACE_NAME} -p CCS_ACCOUNT_ID=${OSD_STAGING_2_AWS_ACCOUNT_ID} -p KMS_KEY_ID=${KMS_KEY_ID} -f hack/templates/aws.managed.openshift.io_v1alpha1_kms_accountclaim_cr.tmpl | oc delete -f -
 	@oc delete secret byoc -n ${KMS_NAMESPACE_NAME}
 	@oc process --local -p NAME=${KMS_NAMESPACE_NAME} -f hack/templates/namespace.tmpl | oc delete -f -
+
+#############################################################################################
+# New self-contained test pattern (test/integration/tests/*.sh)
+#############################################################################################
+
+.PHONY: test-nonccs-account-creation
+test-nonccs-account-creation: ## Test non-CCS account creation and AWS credential generation
+	test/integration/tests/test_nonccs_account_creation.sh setup
+	test/integration/tests/test_nonccs_account_creation.sh test
+	test/integration/tests/test_nonccs_account_creation.sh cleanup
+
+.PHONY: test-nonccs-account-reuse
+test-nonccs-account-reuse: ## Test account cleanup and reuse (S3 bucket deletion)
+	test/integration/tests/test_nonccs_account_reuse.sh setup
+	test/integration/tests/test_nonccs_account_reuse.sh test
+	test/integration/tests/test_nonccs_account_reuse.sh cleanup
+
+.PHONY: test-aws-ou-logic
+test-aws-ou-logic: ## Test AWS OU logic for claimed accounts
+	test/integration/tests/test_aws_ou_logic.sh setup
+	test/integration/tests/test_aws_ou_logic.sh test
+	test/integration/tests/test_aws_ou_logic.sh cleanup
+
+.PHONY: test-pool-exhaustion
+test-pool-exhaustion: ## Test account pool exhaustion and account reuse
+	test/integration/tests/test_account_pool_exhaustion.sh setup
+	test/integration/tests/test_account_pool_exhaustion.sh test
+	test/integration/tests/test_account_pool_exhaustion.sh cleanup
+
+.PHONY: test-concurrent-claims
+test-concurrent-claims: ## Test concurrent AccountClaim race conditions
+	test/integration/tests/test_concurrent_accountclaims.sh setup
+	test/integration/tests/test_concurrent_accountclaims.sh test
+	test/integration/tests/test_concurrent_accountclaims.sh cleanup
+
+# Meta target to run all new pattern tests
+.PHONY: test-integration-new
+test-integration-new: test-nonccs-account-creation test-nonccs-account-reuse test-aws-ou-logic test-pool-exhaustion test-concurrent-claims ## Run all new self-contained integration tests
